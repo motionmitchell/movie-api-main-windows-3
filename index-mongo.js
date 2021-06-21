@@ -72,7 +72,7 @@ app.get("/user/delete/:un", (req, res)=> {
     });
     });
 });
-app.get("/movie/update/:id/:name",  (req, res) =>{
+app.post("/movie/update/:id/:name",  (req, res) =>{
 	const id = req.params.id;
 	const name = req.params.name;
 	    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
@@ -91,7 +91,7 @@ app.get("/movie/update/:id/:name",  (req, res) =>{
 		});
 	});
 });
-app.get("/movie/updateBio/:id/:bio",  (req, res) =>{
+app.post("/movie/updateBio/:id/:bio",  (req, res) =>{
 	const id = req.params.id;
 	const bio = req.params.bio;
 	
@@ -117,7 +117,7 @@ app.get("/movie/updateBio/:id/:bio",  (req, res) =>{
 		
 	});
 });
-app.get("/user/movie/add/:un/:id", async (req, res) =>{
+app.post("/user/movie/add/:un/:id", async (req, res) =>{
 	const un = req.params.un;
 	const id= req.params.id;
 	 MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true},async function (err, db) {
@@ -125,13 +125,11 @@ app.get("/user/movie/add/:un/:id", async (req, res) =>{
             throw err;
         var dbo = db.db("movies");
         await dbo.collection("users").findOne({username:un},async function (err, result) {
-            if (err)
-                throw err;
+ 
 			console.log(result);
 			result.favorites.push (parseInt(id));
 			await dbo.collection("users").updateOne({username:un}, {$set: {favorites: result.favorites}},function (err, result) {
-            if (err)
-                throw err;
+         
 			
 			});
 			
@@ -179,7 +177,7 @@ app.get("/movie/name/:name", async (req, res) =>{
         if (err)
             throw err;
         var dbo = db.db("movies");
-        dbo.collection("movies").find({description:name}).toArray(function (err, result) {
+        dbo.collection("movies").find({title:name}).toArray(function (err, result) {
             if (err)
                 throw err;
 			res.json (result);
@@ -208,6 +206,7 @@ app.get("/movies/genre/:genre", async (req, res) =>{
 app.get("/movies/director/:name", async (req, res) =>{
 	const name = req.params.name;
 	console.log("name: "+name)
+// I dont get this next line
     MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
         if (err)
             throw err;
@@ -238,6 +237,8 @@ app.get("/movies/gd/:genre/:dir", async (req, res) =>{
         });
     });
 });
+
+//Dont get this next line
 async function query (qry)
 {
 	const res= await client.query(qry);
