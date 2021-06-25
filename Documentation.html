@@ -7,9 +7,10 @@
     <title>Movie Api</title>
 	<script>
 		var GC_MOVIES=null;
-		function pageLoad ()
+		const url = 'http://localhost:8080/movies';
+		function getAllMovies ()
 		{
-			getMovies();
+			getMovies(url);
 		}
 		function queryClick ()
 		{
@@ -89,11 +90,15 @@
 			//alert(url);
 			callServer (url);
 		}
+		function getUser()
+		{
+
+		}
 		function deleteUser()
 		{
 			const un = prompt ("User Name: ");
 			
-			const url = "http://localhost:8080/user/delete/"+un;
+			const url = "http://localhost:8080/user/unreg/"+un;
 			//alert(url);
 			callServer (url);
 		}
@@ -115,6 +120,7 @@
     </h1>
 	<p><input type='text' id='queryValue'/><p>
 	<p>Director:<input type='text' id='director'/><p>
+	<p><button onClick='getAllMovies()'>Get All Moves</button>		
 	<p><button onClick='getMoviesByName()'>Find by Name</button>
 	<p><button onClick='getMoviesByGenre()'>Find by Genre</button>
 	<p><button onClick='getMoviesByGenreAndDirector()'>Find by Genre and Director</button>
@@ -130,6 +136,13 @@
 		<p><button onClick='updateMovieName()'>Update Movie Name</button>
 		<p><button onClick='updateDirBio()'>Update Director BIO</button>
 		<p><button onClick='addToFavorites()'>Add To Favorites</button>
+	</div>
+
+	<div>
+		<form method="post" action ="http://localhost:8080/users/register">
+			<input type='text' name='username'/>
+			<input type='submit'/>
+		</form>
 	</div>
 </body>
 </html>

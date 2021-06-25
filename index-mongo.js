@@ -3,271 +3,234 @@ const express = require('express');
 const bodyParser = require('body-parser');
 var session = require('express-session');
 //const mysql = require('mysql2');
-const mongodb = require('mongodb');
+const mongoose = require ('mongoose');
 var cors = require('cors');
-const MongoClient = require('mongodb').MongoClient;
+const Models = require('./models.js');
+var Movies = mongoose.model('movies');
 const app = express();
-const GC_MONGO_URL = "mongodb://localhost:27017/";
+const GC_MONGO_URL = "mongodb://localhost:27017/movies";
+const ObjectID = require('mongodb').ObjectID;
+mongoose.connect(GC_MONGO_URL, { useUnifiedTopology: true, useNewUrlParser: true });
+
 app.use(session({secret:'XASDASDA'}));
-var ssn ;
+var ssn;
 app.use(bodyParser.urlencoded({ extended: false}));
 
-const GC_MOVIES = [
-	{"id":3,"description":"Star Wars, return of Jedi","genre":{"category":"Sci Fi"},"director":{"id":1,"name":"George Lucas","bio":"","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":8,"description":"Star Trek, the movie","genre":{"category":"Sci Fi"},"director":{"id":6,"name":"Gene Roddenberry","bio":"Visionary","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":4,"description":"Fight Club","genre":{"category":"Action"},"director":{"id":2,"name":"David Yates","bio":"","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":5,"description":"Fantastic Beast","genre":{"category":"Sci Fi"},"director":{"id":2,"name":"David Yates","bio":"","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":1,"description":"Star Wars, new hope","genre":{"category":"Sci Fi"},"director":{"id":1,"name":"George Lucas","bio":"","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":6,"description":"Seven","genre":{"category":"Action"},"director":{"id":3,"name":"David Fincher","bio":"Great Director","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":7,"description":"Gone Girl","genre":{"category":"Thriller"},"director":{"id":3,"name":"David Fincher","bio":"Great Director","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":2,"description":"Harry Potter","genre":{"category":"Fiction"},"director":{"id":2,"name":"David Yates","bio":"","birthYear":1920,"deathYear":2014},"imageURL":""},
-	{"id":10,"description":"Gladiator","genre":{"category":"Thriller"},"director":{"id":3,"name":"David Fincher","bio":"Great Director","birthYear":1920,"deathYear":2014},"imageURL":""}
-];
-const GC_USERS = [
-	{"username":"admin","password":"Test1234","fullname":"Admin","birthday":"1985-01-01T00:00:00.000Z","email":"admin@test.com","favorites":[1,8,3],"roleId":2},
-	{"username":"ryan","password":"Test1234","fullname":"Ryan Tester","birthday":"1985-03-03T00:00:00.000Z","email":"ryan@test.com","favorites":[2,4],"roleId":1},
-	{"username":"test","password":"Test1234","fullname":"Ryan Tester","birthday":"1985-03-03T00:00:00.000Z","email":"tester@test.com","favorites":[],"roleId":1},
-	{"username":"bob","password":"Test1234","fullname":"Ryan Tester","birthday":"1985-03-03T00:00:00.000Z","email":"bob@test.com","favorites":[],"roleId":1},
-	{"username":"june","password":"Test1234","fullname":"Ryan Tester","birthday":"1985-03-03T00:00:00.000Z","email":"june@test.com","favorites":[],"roleId":1}
-]
 app.use(cors());
-//app.use(morgan('common'));windows 2
+//app.use(morgan('common'));
 app.use(express.static("public"))
 app.use(function (err, req, res, next){
     console.log(err)
     next(err)
-    })
-app.get("/seed", (req, res)=> {
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-		GC_MOVIES.forEach ((obj)=>{
-			dbo.collection("movies").insertOne(obj);
-		});
-		GC_USERS.forEach ((obj)=>{
-			dbo.collection("users").insertOne(obj);
-		});
-    });
-	res.end("done");
 });
-app.get('/', (req, res)=> {
-    res.render("movies");
+app.get("/movies", async (req, res) =>{
+
+	mongoose.model('movies').find((err,movies)=>{
+		res.send(movies);
+	});
+	
+});
+app.get("/movie/title/:title", async (req, res) =>{
+	const title = req.params.title;
+
+	mongoose.model('movies').findOne ({description: title},(err,movie)=>{
+		res.send(movie);
+	});
+});
+
+app.get("/movies/genre/:genre", async (req, res) =>{
+	const genre = req.params.genre;
+	console.log("id: "+genre)
+	
+	mongoose.model('movies').findOne ({genre:{category:genre}},(err,movie)=>{
+		res.send(movie.genre);
+	});
+});
+app.get("/movies/director/:name", async (req, res) =>{
+	const nm = req.params.name;
+	console.log("name: "+nm)
+
+	mongoose.model('movies').findOne ({"director.name": {$eq: nm}},(err,movies)=>{
+		if (err)
+		{
+			console.log(err);
+		}
+		res.send(movies.director);
+	});
+});
+app.post("/users/register", async (req, res) =>{
+	// /users/register?username=june17&email=june17@test.com&fullname=June17 Test&birthday=1990-01-02&password=Test1234;
+	console.log (req.body);
+	const user = {
+		username: req.body.username,
+		email: req.body.email,
+		fullname:req.body.fullname,
+		birthday:req.body.birthday,
+		password: req.body.password,
+		favorites:[]
+	};
+	console.log(user);
+	mongoose.model('users').create(user);
+	res.send(user);
+});
+app.post("/users/update", async (req, res) =>{
+	const id = req.body.id;
+	const userUpdate = {
+		
+		username: req.body.username,
+		email: req.body.email,
+		fullname:req.body.fullname,
+		birthday:req.body.birthday,
+		password: req.body.password,
+		favorites:[]
+	};
+	console.log (userUpdate);
+	const result = await mongoose.model('users').findOne({_id: ObjectID(id)},(err,user)=>{
+		user.username=userUpdate.username;
+		user.email=userUpdate.email;
+		user.password=userUpdate.password;
+		user.birthday=userUpdate.birthday;
+//console.log (movie);
+		user.save((err)=>{
+			if (err)
+			{
+				console.log (err);
+				res.end("user not updated");
+			}else{
+				res.end("user updated");
+			}
+	});
+	})
+});
+app.get("/user/movie/add/:un/:id", async (req, res) =>{
+	const un = req.params.un;
+	const id= req.params.id;
+	
+	mongoose.model('users').findOne ({username:un},(err,user)=>{
+			user.favorites.push (parseInt(id));
+//console.log (movie);
+			user.save((err)=>{
+				if (err)
+				{
+					console.log (err);
+					res.end("Favorite not added");
+				}else{
+					res.end("Favorite Added");
+				}
+		});
+	});
+})
+app.get("/user/movie/remove/:un/:id", async (req, res) =>{
+	const un = req.params.un;
+	const id= parseInt(req.params.id);
+	
+	mongoose.model('users').findOne ({username:un},(err,user)=>{
+			let fav=[];
+			user.favorites.forEach ((val)=>{
+				if (val!==id)
+				{
+					fav.push (val);
+				}
+			})
+
+			user.favorites=fav;
+//console.log (movie);
+			user.save((err)=>{
+				if (err)
+				{
+					console.log (err);
+					res.end("Favorite not removed");
+				}else{
+					res.end("Favorite removed");
+				}
+		});
+	});
+})
+app.get("/user/unreg/:un", async (req, res) =>{
+	const un = req.params.un;
+	mongoose.model('users').deleteOne ({username:un},(err,user)=>{
+		//user.remove();
+		res.send ("unregistered");
+	})
 })
 app.get("/user/delete/:un", (req, res)=> {
 	const un = req.params.un+"";
 	//console.log("ID: "+id);
-	MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-		//new mongodb.ObjectID(id)
-        dbo.collection("users").deleteOne({username: un}, function(err, results) {
-       if (err){
-         console.log("failed");
-         throw err;
-       }
-       console.log("success");
-	   res.end("deleted");
-    });
-    });
+	mongoose.model('users').deleteOne({username:un},(err,u)=>{
+		res.end("user deleted");
+	});
 });
-app.post("/movie/update/:id/:name",  (req, res) =>{
+app.get("/users", (req, res)=>{
+	const connection = mongoose.connection;
+	mongoose.model('users').find ((err,users)=>{
+		res.send(users);
+	});
+});
+app.get("/movie/update/:id/:name",  (req, res) =>{
 	const id = req.params.id;
 	const name = req.params.name;
-	    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-		var myquery = { id: parseInt(id) };
-		var newvalues = { $set: {description: name } };
-		console.log (myquery);
-		console.log (newvalues);
-		dbo.collection("movies").updateOne(myquery, newvalues, function(err, result) {
-			if (err) throw err;
-				console.log("1 document updated");
-			db.close();
-			res.end("updated");
+	
+	mongoose.model('movies').findOne ({id: parseInt(id)},(err,movie)=>{
+			movie.description=name;
+
+			movie.save((err)=>{
+				if (err)
+				{
+					console.log (err);
+					res.end("Movie NOT Updated");
+				}else{
+					res.end("Movie Updated");
+				}
 		});
 	});
 });
-app.post("/movie/updateBio/:id/:bio",  (req, res) =>{
+app.get("/movie/updateBio/:id/:bio",  (req, res) =>{
 	const id = req.params.id;
 	const bio = req.params.bio;
 	
-
+	//User.update({"created": false}, {"$set":{"created": true}}, {"multi": true}, (err, writeResult) => {});
+	var myquery = { "director.id": parseInt(id)};
+	var newvalues = { $set: {"director.bio": bio} };
+	Movies.updateMany(myquery, newvalues, {"multi": true}, (err, writeResult) => {});
 	
-	    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-		
-		var myquery = { "director.id": parseInt(id)};
-		  var newvalues = { $set: {"director.bio": bio} };
-		  console.log (myquery);
-		  console.log (newvalues);
-	  dbo.collection("movies").updateMany(myquery, newvalues, function(err, result) {
-		if (err) throw err;
-		console.log("1 document updated");
-		db.close();
-		res.end("updated");
-	  });
-  
-		
-		
+	res.end("updated");
+});
+app.get("/user/:un", async (req, res) =>{
+	const un = req.params.un;
+	mongoose.model('users').findOne ({username:un},(err,user)=>{
+		res.send(user);
+	})
+});
+
+
+
+
+
+
+app.get("/movies/title/:title", async (req, res) =>{
+	const title = req.params.title;
+	console.log("id: "+genre)
+	
+	mongoose.model('movies').find ({genre:{category:genre}},(err,movies)=>{
+		res.send(movies);
 	});
 });
-app.post("/user/movie/add/:un/:id", async (req, res) =>{
-	const un = req.params.un;
-	const id= req.params.id;
-	 MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true},async function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        await dbo.collection("users").findOne({username:un},async function (err, result) {
- 
-			console.log(result);
-			result.favorites.push (parseInt(id));
-			await dbo.collection("users").updateOne({username:un}, {$set: {favorites: result.favorites}},function (err, result) {
-         
-			
-			});
-			
-            db.close();
-			res.end("added");
-        });
-    });
-	
-})
-app.get("/movies", async (req, res) =>{
 
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("movies").find({}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
-	
-});
-app.get("/users", async (req, res) =>{
-
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("users").find({}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
-	
-});
-app.get("/movie/name/:name", async (req, res) =>{
-	const name = req.params.name;
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("movies").find({title:name}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
-	
-});
-app.get("/movies/genre/:genre", async (req, res) =>{
-	const genre = req.params.genre;
-	console.log("id: "+genre)
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("movies").find({genre:{category:genre}}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
-});
-app.get("/movies/director/:name", async (req, res) =>{
-	const name = req.params.name;
-	console.log("name: "+name)
-// I dont get this next line
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("movies").find({ "director.name": {$eq: name}}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
-});
 app.get("/movies/gd/:genre/:dir", async (req, res) =>{
 	const genre = req.params.genre;
 	const dir = req.params.dir;
 	console.log (dir+", genre: "+genre);
-    MongoClient.connect(GC_MONGO_URL, {useUnifiedTopology: true}, function (err, db) {
-        if (err)
-            throw err;
-        var dbo = db.db("movies");
-        dbo.collection("movies").find({$or:[{genre:{category:genre},  "director.name": {$eq: dir}}]}).toArray(function (err, result) {
-            if (err)
-                throw err;
-			res.json (result);
-            db.close();
-			res.end();
-        });
-    });
+	
+	mongoose.model('movies').find ({genre:{category:genre},"director.name": {$eq: dir}},(err,movies)=>{
+		if (err)
+		{
+			console.log(err);
+		}
+		res.send(movies);
+	});
 });
 
-//Dont get this next line
-async function query (qry)
-{
-	const res= await client.query(qry);
-	return res.rows;
-}
-app.get("/movie/:id", async (req, res) =>{
-	const id = req.params.id;
-	console.log("ID: "+id);
-	const qry = 'SELECT * FROM view_movies WHERE id ='+id;
-    const rows =await query (qry);
-	res.send(rows);
-	res.end();
-});
-app.get("/genre/:id", async (req, res) =>{
-	const id = req.params.id;
-	console.log("ID: "+id);
-	const qry ='SELECT name FROM genres WHERE id ='+id;
-	const rows =await query (qry);
-	res.send(rows);
-	res.end();
-});
-app.get("/director/:id", async (req, res) =>{
-	const id = req.params.id;
-	console.log("ID: "+id);
-	const qry = 'SELECT * FROM directors WHERE id ='+id;
-	const rows =await query (qry);
-	res.send(rows);
-	res.end();
-});
+
 app.get("/login",  (req, res) =>{
     ssn=req.session;
     res.writeHead(200, {'Content-Type': 'text/html'});
@@ -305,52 +268,6 @@ app.get('/secreturl', (req, res) => {
     res.send('This is a secret url with super top-secret content.');
 })
 
-app.post ("/register", async(req, res) => {
-	const un = req.body.username;
-	const pw = req.body.password;
-	const nm = req.body.fullname;
-	const em = req.body.email;
-	
-	let insert = "INSERT INTO users(username,password,full_name,email,role_id) VALUES (";
-	let values = `'${un}','${pw}','${nm}','${em}')`;
-	const t = await query (insert+values);
-
-	res.end("registered");
-})
-app.get ("/register", async(req, res) => {
-	const un = req.query.un;
-	const pw = req.query.pw;
-	const nm = req.query.fn;
-	const em = req.query.em;
-	//register?un=test&pw=Test1234&fn=Tester&em=test@gmail.com
-	let insert = "INSERT INTO users(username,password,full_name,email,role_id) VALUES (";
-	let values = `'${un}','${pw}','${nm}','${em}',1)`;
-	const t =await query (insert+values);
-
-	res.end("registered");
-})
-app.post ("/updateUser", (req, res) => {
-	const id = req.body.id
-//	const un = req.body.username;
-//	const pw = req.body.password;
-	const fn = req.body.fullname;
-	const em = req.body.email;
-	
-	let update = `UPDATE users SET fullname = '${fn}, email='${em}' WHERE id = ${id}`;
-	query (update);
-	res.end("updated");
-})
-app.get ("/updateUser", (req, res) => {
-	const id = req.query.id
-//	const un = req.body.username;
-//	const pw = req.body.password;
-	const fn = req.query.fn;
-	const em = req.query.em;
-	//updateUser?id=4&fn=June&em=test@june.com
-	let update = `UPDATE users SET full_name = '${fn}', email='${em}' WHERE id = ${id}`;
-	query (update);
-	res.end("updated: "+update);
-})
 function getCurrentUser ()
 {
 	try {
@@ -377,84 +294,7 @@ app.get('/users', (req, res) => {
 		res.json(users);
 	}
 })
-app.get('/directors', (req, res) => {
-    res.json(directors)
-})
 
-app.get('/genre', (req, res) => {
-    res.json(genre)
-})
-app.get('/movies', (req, res) => {
-    res.json(movies)
-})
-
-app.get('/name', (req, res) => {
-    res.json(name)
-})
-
-app.get('/director/:nm', (req, res) => {
-	const nm = req.params.nm;
-	console.log ("nm: "+nm);
-	const d=getDirector(nm);
-	res.json (d);
-})
-app.get('/movie/:id', (req, res) => {
-	const id = req.params.id;
-	console.log ("id: "+id);
-	const m=getMovie(parseInt(id));
-	res.json (m);
-})
-app.get('/addMovie/:un/:id', async(req, res) => {
-	const un = req.params.un;
-	const id = req.params.id;
-	console.log ("id: "+id);
-	const insert = `INSERT INTO user_movies (user_id, movie_id) VALUES (${un}, ${id})`;
-	query (insert);
-	res.end("added");
-})
-app.get('/removeMovie/:un/:id', (req, res) => {
-	const id = req.params.id;
-	const un = req.params.un;
-	console.log ("id: "+id);
-	const del = `DELETE FROM user_movies WHERE user_id =${un} AND movie_id = ${id}`;
-	query (del);
-	res.end("deleted");
-})
-app.get('/unregister', (req, res) => {
-});
-app.get('/genre/:g', (req, res) => {
-	const g = req.params.g;
-	console.log ("genre: "+g);
-	let data=[];
-	for (let i in movies)
-	{
-		if (movies[i].genre===g)
-		{
-			data.push(movies[i]);
-		}
-	}
-	res.json (data);
-})
-function getDirector (name)
-{
-	for (let i in directors)
-	{
-		if (directors[i].name===name)
-		{
-			return directors[i];
-		}
-	}
-}
-function getMovie (id)
-{
-	for (let i in movies)
-	{
-		if (movies[i].id===id)
-		{
-			return movies[i];
-		}
-	}
-}
 app.listen(8080, () => {
     console.log('Your app is listening on port 8080.');
 })
