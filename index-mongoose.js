@@ -6,7 +6,11 @@ var session = require('express-session');
 const mongoose = require ('mongoose');
 var cors = require('cors');
 const Models = require('./models.js');
-var Movies = mongoose.model('movies');
+const Movies = mongoose.model('movies');
+const passport = require('passport');
+const jwt = require('jsonwebtoken');
+const auth =require('./auth');
+
 const app = express();
 const GC_MONGO_URL = "mongodb://localhost:27017/movies";
 const ObjectID = require('mongodb').ObjectID;
@@ -38,11 +42,11 @@ app.get("/movie/title/:title", async (req, res) =>{
 	});
 });
 
-app.get("/movies/genre/:genre", async (req, res) =>{
+app.get("/movies/genre/:movies", async (req, res) =>{
 	const genre = req.params.genre;
 	console.log("id: "+genre)
 	
-	mongoose.model('movies').findOne ({genre:{category:genre}},(err,movie)=>{
+	mongoose.model('movies').findOne ({genre:{category:movies}},(err,movie)=>{
 		res.send(movie.genre);
 	});
 });
@@ -58,7 +62,105 @@ app.get("/movies/director/:name", async (req, res) =>{
 		res.send(movies.director);
 	});
 });
-app.post("/users/register", async (req, res) =>{
+app.get('/users/register', (req, res, next) => {
+   
+    const form = '<h1>Login Page</h1><form method="POST" action="/users/register">\
+    <br/>Enter Username:<br><input type="text" name="email">\
+	<br/>Enter Full Name:<br><input type="text" name="fullname">\
+	<br/>Enter birthdate:<br><input type="text" name="birthdate">\
+    <br>Enter Password:<br><input type="password" name="password">\
+    <br><br><input type="submit" value="Submit"></form>';
+
+    res.send(form);
+
+});
+
+app.get('/login', (req, res, next) => {
+   
+    const form = '<h1>Login Page</h1><form method="POST" action="/users/login">\
+    Enter Username:<br><input type="text" name="email">\
+    <br>Enter ID:<br><input type="text" name="password">\
+    <br><br><input type="submit" value="Submit"></form>';
+
+    res.send(form);
+
+});
+var GV_USER=null;
+app.post(
+	'/users/register',
+	passport.authenticate('signup', { session: false }),
+	async (req, res, next) => {
+		//await saveUser()
+		let u=req.user;
+		u.fullname= req.body.fullname;
+		u.birthday=req.body.birthdate;
+		console.log(u);
+		await saveUser(u);
+	  res.json({
+		message: 'Signup successful',
+		user: u
+	  });
+	}
+  );
+  async function saveUser (updateUser)
+  {
+	  console.log ("SAVE USER:");
+	  console.log (updateUser);
+	const result = await mongoose.model('users').findOne({_id: ObjectID(updateUser._id)},(err,user)=>{
+		user.fullname=updateUser.fullname;
+		user.email=updateUser.email;
+		user.password=updateUser.password;
+		user.birthday=updateUser.birthday;
+console.log (user);
+		user.save((err)=>{
+			if (err)
+			{
+				console.log (err);
+				//res.end("user not updated");
+			}else{
+				//res.end("user updated");
+			}
+	});
+	})
+	return;
+  } 
+  app.post(
+	'/users/login',
+	async (req, res, next) => {
+	   // const user = {password: req.body.password, email: req.body.email};
+	   // console.log(user);
+	  passport.authenticate(
+		'login',
+		async (err, user, info) => {
+		  try {
+			  console.log ("auth done");
+			  //console.log(user);
+			if (err || !user) {
+			//  const error = new Error('An error occurred.');
+				return res.json({Error: "An error occurred."});
+			 // return next(error);
+			}
+  
+			req.login(
+			  user,
+			  { session: false },
+			  async (error) => {
+				if (error) return next(error);
+  
+				const body = { _id: user._id, email: user.email };
+				const token = jwt.sign({ user: body }, 'TOP_SECRET');
+  
+				return res.json({ token });
+			  }
+			);
+		  } catch (error) {
+			return next(error);
+		  }
+		}
+	  )(req, res, next);
+	}
+  );
+app.post("/users/registerOld", async (req, res) =>{
 	// /users/register?username=june17&email=june17@test.com&fullname=June17 Test&birthday=1990-01-02&password=Test1234;
 	console.log (req.body);
 	const user = {
@@ -241,10 +343,10 @@ app.get("/login",  (req, res) =>{
     res.write('</form><a href="/new">Create profile</a>');
     res.end();
 });
-app.post ("/login",  (req, res) =>{
+app.post ("/login", async (req, res) =>{
 	const un = req.body.username;
 	const pw = req.body.password;
-	const user = getUser(un);
+	const user = await getUser(un);
 	if (user.password==pw)
 	{
 		ssn=req.session;
@@ -254,15 +356,10 @@ app.post ("/login",  (req, res) =>{
 		res.end("invalid loggin");
 	}
 });
-function getUser (un)
+async function getUser (un)
 {
-	for (let i in users)
-	{
-		if (users[i].username==un)
-		{
-			return users[i];
-		}
-	}
+	let foundUser = await mongoose.model('users').findOne({ username:un });
+	return foundUser;
 }
 app.get('/secreturl', (req, res) => {
     res.send('This is a secret url with super top-secret content.');
